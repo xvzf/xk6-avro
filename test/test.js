@@ -15,6 +15,7 @@ export function setup() {
   const binary = codec.binaryFromTextual(testPayload)
   const textual = codec.textualFromBinary(binary)
 
+  console.log(`binary -- ${binary}`)
   if(testPayload !== textual) {
     console.log(`${textPayload} !== ${textual}`)
     fail("idempotence failed")

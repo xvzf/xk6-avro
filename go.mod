@@ -1,4 +1,4 @@
-module github.com/shjagann/xk6-avro
+module github.com/sharathjag/xk6-avro
 
 go 1.21
 

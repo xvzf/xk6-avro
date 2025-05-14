@@ -19,16 +19,6 @@ func init() {
 // instances for each VU.
 type RootModule struct{}
 
-// ModuleInstance represents an instance of the JS module.
-// type ModuleInstance struct {
-// 	// vu provides methods for accessing internal k6 objects for a VU
-// 	vu modules.VU
-// 	// avro is the exported type
-// 	avro *Avro
-
-// 	exports modules.Exports
-// }
-
 type Avro struct {
 	// vu provides methods for accessing internal k6 objects for a VU
 	vu modules.VU
@@ -45,10 +35,6 @@ func New() *RootModule {
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	mod := &Avro{
 		vu: vu,
-		// exports: modules.Exports{
-		// Named:   make(map[string]interface{}),
-		// Default: nil,
-		// },
 	}
 	mod.exports.Default = mod
 	return mod
@@ -74,8 +60,28 @@ func (a *Avro) NewCodec(c sobek.ConstructorCall) *sobek.Object {
 	return rt.ToValue(&AvroCodec{codec: codec}).ToObject(rt)
 }
 
+func (a *Avro) NewBytesCodec() *sobek.Object {
+	schema := `{"type":"bytes"}`
+	codec, err := a.newCodec(schema)
+
+	if err != nil {
+		return nil
+	}
+	rt := a.vu.Runtime()
+	return rt.ToValue(&AvroCodec{codec: codec, schema: schema}).ToObject(rt)
+}
+
+func (a *Avro) newCodec(schema string) (*goavro.Codec, error) {
+	codec, err := goavro.NewCodec(schema)
+	if err != nil {
+		return nil, err
+	}
+	return codec, nil
+}
+
 type AvroCodec struct {
-	codec *goavro.Codec
+	codec  *goavro.Codec
+	schema string
 }
 
 // BinaryFromTextual converts an avro json encoded document into its binary representation.
@@ -102,6 +108,20 @@ func (ac *AvroCodec) TextualFromBinary(binary []byte) string {
 		return fmt.Sprintf("%v", err)
 	}
 	return string(textual)
+}
+
+// EncodeBytes encodes native binary data as byte type
+func (ac *AvroCodec) EncodeBytes(data []byte) ([]byte, error) {
+	if ac.schema == "" || ac.schema != `{"type":"bytes"}` {
+		return nil, fmt.Errorf("EncodeNative only supports 'bytes' schema")
+	}
+
+	if ac.codec == nil {
+		return nil, fmt.Errorf("codec not initialized")
+	}
+
+	// Encode []byte as native Avro "bytes"
+	return ac.codec.BinaryFromNative(nil, data)
 }
 
 // Ensure the interfaces are implemented correctly.
